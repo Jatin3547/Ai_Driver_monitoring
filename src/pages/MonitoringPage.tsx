@@ -28,14 +28,25 @@ export default function MonitoringPage() {
     setLiveStatuses((prev) => {
       const base = prev ?? initialStatuses ?? [];
       const exists = base.some((s) => s.driverId === update.driverId);
-      return exists
+      const updated = exists
         ? base.map((s) => (s.driverId === update.driverId ? update : s))
         : [...base, update];
+      return updated.sort((a, b) => {
+        const aLive = a.driverId === 'DRV-001' || a.source === 'live';
+        const bLive = b.driverId === 'DRV-001' || b.source === 'live';
+        if (aLive && !bLive) return -1;
+        if (!aLive && bLive) return 1;
+        return a.driverId.localeCompare(b.driverId);
+      });
     });
   });
 
   useFleetSocketEvent<MonitoringEvent>('safety_event', (event) => {
-    setLiveEvents((prev) => [event, ...(prev ?? initialEvents ?? [])].slice(0, 50));
+    setLiveEvents((prev) => {
+      const base = prev ?? initialEvents ?? [];
+      if (base.some((e) => e.id === event.id)) return base;
+      return [event, ...base].slice(0, 50);
+    });
   });
 
   if (status === 'loading') return <LoadingState label="Connecting to monitoring feeds…" />;

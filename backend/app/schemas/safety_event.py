@@ -25,3 +25,6 @@ class DriverMonitoringStatusOut(BaseModel):
     distractionStatus: str
     lastUpdated: str
     source: str
+    metrics: dict[str, float] | None = None
+    cameraStatus: str | None = None
+    aiHealth: str | None = None

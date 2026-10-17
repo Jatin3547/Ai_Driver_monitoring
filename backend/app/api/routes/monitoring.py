@@ -15,11 +15,12 @@
 
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends
+import time
+from fastapi import APIRouter, Depends, Request
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
-from app.ai.factory import ai_status, get_detector
-from app.ai.simulator import compute_driver_status
+from app.ai.factory import ai_status, get_detector, get_driver_status, get_video_frame
 from app.api.deps import get_db
 from app.models import Driver, SafetyEvent, Vehicle
 from app.services.safety_engine import process_detection
@@ -36,10 +37,8 @@ def monitoring_status(db: Session = Depends(get_db)):
     results = []
     for driver in drivers:
         vehicle = db.query(Vehicle).filter(Vehicle.id == driver.assigned_vehicle_id).first()
-        if not vehicle:
-            continue
-        status = compute_driver_status(driver.code)
-        results.append({**status, "driverId": driver.code, "vehicleId": vehicle.code})
+        status = get_driver_status(driver.code, vehicle.code)
+        results.append(status)
     return results
 
 
@@ -48,10 +47,59 @@ def monitoring_ai_status():
     return ai_status()
 
 
+@router.get("/video-feed")
+def monitoring_video_feed():
+    def frame_stream():
+        while True:
+            frame_bytes = get_video_frame()
+            if frame_bytes:
+                yield (
+                    b"--frame\r\n"
+                    b"Content-Type: image/jpeg\r\n\r\n" + frame_bytes + b"\r\n"
+                )
+            time.sleep(0.033)
+
+    return StreamingResponse(
+        frame_stream(),
+        media_type="multipart/x-mixed-replace; boundary=frame"
+    )
+
+
+@router.post("/camera-frame")
+async def push_camera_frame(request: Request):
+    """Receives a JPEG camera frame uploaded directly from browser / USB bridge."""
+    detector = get_detector()
+    if detector is None or not hasattr(detector, "camera"):
+        return {"ok": False, "error": "Live camera detector is not active"}
+
+    body = await request.body()
+    if not body:
+        return {"ok": False, "error": "Empty body"}
+
+    try:
+        import cv2
+        import numpy as np
+
+        nparr = np.frombuffer(body, np.uint8)
+        frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        if frame is None:
+            return {"ok": False, "error": "Failed to decode frame"}
+
+        detector.camera.inject_frame(frame, source_name="browser_usb")
+        return {"ok": True, "source": "browser_usb"}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
+
+
 @router.get("/events")
 def monitoring_events(db: Session = Depends(get_db), limit: int = 25):
+    from app.ai.factory import active_source
+
     detector = get_detector()
-    drivers = [d for d in db.query(Driver).all() if d.status in _ONLINE_STATUSES and d.assigned_vehicle_id][:3]
+    if active_source() == "live":
+        drivers = [d for d in db.query(Driver).all() if d.code == "DRV-001" and d.status in _ONLINE_STATUSES and d.assigned_vehicle_id]
+    else:
+        drivers = [d for d in db.query(Driver).all() if d.status in _ONLINE_STATUSES and d.assigned_vehicle_id][:3]
 
     for driver in drivers:
         recent = (

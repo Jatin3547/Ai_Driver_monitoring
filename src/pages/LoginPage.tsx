@@ -9,8 +9,8 @@ import { useAuth } from '@/hooks/useAuth';
 export default function LoginPage() {
   const navigate = useNavigate();
   const { login, loading, error } = useAuth();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('admin@fleetguard.demo');
+  const [password, setPassword] = useState('admin123');
   const [localError, setLocalError] = useState<string | null>(null);
 
   async function handleSubmit(e: FormEvent) {
@@ -106,6 +106,17 @@ export default function LoginPage() {
             <Button type="submit" className="w-full" disabled={!USE_MOCK_DATA && loading}>
               {!USE_MOCK_DATA && loading ? 'Signing in…' : 'Sign in'}
             </Button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setEmail('admin@fleetguard.demo');
+                setPassword('admin123');
+              }}
+              className="w-full py-1.5 text-xs text-brand-blue hover:underline text-center cursor-pointer"
+            >
+              Click here to auto-fill demo credentials
+            </button>
           </form>
         </div>
 

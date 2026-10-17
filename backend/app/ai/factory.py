@@ -50,10 +50,57 @@ def ai_status() -> dict:
     claims 'live' unless a live detector genuinely constructed successfully."""
     from app.ai.vision import VISION_DEPENDENCIES_AVAILABLE
 
-    get_detector()  # ensures _active_source reflects a real attempt
+    detector = get_detector()  # ensures _active_source reflects a real attempt
+    diag = {}
+    if _active_source == "live" and hasattr(detector, "get_diagnostics"):
+        diag = detector.get_diagnostics()
+
     return {
         "configuredMode": settings.ai_mode,
         "activeSource": _active_source,
         "visionDependenciesInstalled": VISION_DEPENDENCIES_AVAILABLE,
         "cameraIndex": settings.ai_camera_index,
+        "diagnostics": diag,
     }
+
+
+PRIMARY_LIVE_DRIVER_CODE = "DRV-001"
+
+
+def get_driver_status(driver_code: str, vehicle_code: str | None = None) -> dict:
+    """Returns real structured monitoring metrics for primary live driver, or independent simulated status for others."""
+    detector = get_detector()
+    if _active_source == "live" and driver_code == PRIMARY_LIVE_DRIVER_CODE and hasattr(detector, "get_monitoring_status"):
+        return detector.get_monitoring_status(driver_code, vehicle_code)
+
+    from app.ai.simulator import compute_driver_status
+    base_status = compute_driver_status(driver_code)
+    return {
+        **base_status,
+        "driverId": driver_code,
+        "vehicleId": vehicle_code or "",
+        "cameraStatus": "simulated",
+        "aiHealth": "healthy",
+        "metrics": {"ear": 0.28, "mar": 0.20, "headYaw": 0.0},
+    }
+
+
+def get_video_frame():
+    """Returns latest JPEG frame bytes if live camera is active, or None."""
+    detector = get_detector()
+    if _active_source == "live" and hasattr(detector, "get_latest_jpeg_frame"):
+        return detector.get_latest_jpeg_frame()
+    return None
+
+
+def shutdown_detector() -> None:
+    """Cleanly releases any hardware or worker threads."""
+    global _detector, _active_source
+    if _detector is not None and hasattr(_detector, "shutdown"):
+        try:
+            _detector.shutdown()
+        except Exception:
+            pass
+    _detector = None
+    _active_source = "simulation"
+

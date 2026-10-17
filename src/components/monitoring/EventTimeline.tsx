@@ -25,8 +25,8 @@ export function EventTimeline({ events, drivers, vehicles }: Props) {
         <EmptyState icon={History} title="No events recorded" />
       ) : (
         <ol className="relative border-l border-border ml-2 space-y-5">
-          {sorted.map((event) => (
-            <li key={event.id} className="ml-4">
+          {sorted.map((event, idx) => (
+            <li key={`${event.id}-${idx}`} className="ml-4">
               <span className="absolute -left-[5px] w-2.5 h-2.5 rounded-full bg-brand-blue mt-1.5" />
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-sm font-medium text-text-primary">

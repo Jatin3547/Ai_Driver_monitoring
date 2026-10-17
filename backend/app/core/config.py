@@ -7,11 +7,17 @@ Nothing else in the codebase should call `os.environ` directly — import
 
 from functools import lru_cache
 
-from pydantic_settings import BaseSettings, SettingsConfigDict
+try:
+    from pydantic_settings import BaseSettings, SettingsConfigDict
+
+    class _BaseSettings(BaseSettings):
+        model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+except ImportError:
+    class _BaseSettings:  # type: ignore[no-redef]
+        pass
 
 
-class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+class Settings(_BaseSettings):
 
     # Database
     database_url: str = "sqlite:///./fleet.db"
@@ -28,8 +34,27 @@ class Settings(BaseSettings):
     # hardware or heavy dependencies; "live" does (see README).
     gps_mode: str = "demo"
     ai_mode: str = "demo"
-    ai_camera_index: int = 0
+    ai_camera_index: int | str = 0
     ai_event_cooldown_seconds: int = 30  # min gap between incidents of the same type for the same driver
+
+    # Computer Vision Thresholds and Durations
+    ai_ear_threshold: float = 0.125
+    ai_mar_threshold: float = 0.25
+    ai_yaw_threshold_degrees: float = 25.0
+    ai_drowsiness_duration_seconds: float = 1.0
+    ai_eye_closure_warning_seconds: float = 0.6
+    ai_yawn_duration_seconds: float = 1.0
+    ai_distraction_duration_seconds: float = 2.0
+    ai_absence_grace_seconds: float = 2.5
+    ai_target_fps: int = 15
+    ai_camera_reconnect_max_retries: int = 5
+
+    # Phone Detection Settings (Pretrained YOLOv8)
+    ai_phone_detection_enabled: bool = True
+    ai_phone_model: str = "yolov8n.pt"
+    ai_phone_confidence_threshold: float = 0.35
+    ai_phone_usage_duration_seconds: float = 1.5
+    ai_phone_warning_duration_seconds: float = 0.6
 
     environment: str = "development"
 

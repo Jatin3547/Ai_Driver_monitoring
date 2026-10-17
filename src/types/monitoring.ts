@@ -32,4 +32,12 @@ export interface DriverMonitoringStatus {
   phoneUseStatus: MonitoringSignalStatus;
   distractionStatus: MonitoringSignalStatus;
   lastUpdated: string; // ISO datetime
+  source?: string;
+  cameraStatus?: string;
+  aiHealth?: string;
+  metrics?: {
+    ear?: number;
+    mar?: number;
+    headYaw?: number;
+  };
 }
